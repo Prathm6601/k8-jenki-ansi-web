@@ -1,0 +1,41 @@
+node {
+    stage('Git checkout'){
+        git branch: 'main', url: 'https://github.com/Prathm6601/k8-jenki-ansi-web.git'
+    }
+    stage('sending docker file to amsible server over ssh'){
+        sshagent(['ansible']) {
+          sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200'
+          sh 'scp /var/lib/jenkins/workspace/k8s-all/* ubuntu@172.31.81.200:/home/ubuntu'
+      } 
+    }
+    stage('Docker build image'){
+        sshagent(['ansible']) {
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 cd /home/ubuntu/'
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image build -t $JOB_NAME:v1.$BUILD_ID .'
+        }
+    }
+    stage('Docker image tagging'){
+        sshagent(['ansible']) {
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 cd /home/ubuntu/'
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image tag $JOB_NAME:v1.$BUILD_ID prathm6601/$JOB_NAME:v1.$BUILD_ID'
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image tag $JOB_NAME:v1.$BUILD_ID prathm6601/$JOB_NAME:latest'
+        }
+    }
+    stage('push docker image to docker hub'){
+        sshagent(['ansible']) {
+            withCredentials([string(credentialsId: 'dockerhub_pass', variable: 'dockerhub_pass')]) {
+                sh "ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker login -u prathm6601 -p ${dockerhub_pass}"
+                sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image push prathm6601/$JOB_NAME:v1.$BUILD_ID'
+                sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image push prathm6601/$JOB_NAME:latest'
+                sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 docker image rm prathm6601/$JOB_NAME:v1.$BUILD_ID prathm6601/$JOB_NAME:latest $JOB_NAME:v1.$BUILD_ID
+
+            }
+        }   
+    }
+    stage('copy yaml file ansible server to k8s server'){
+        sshagent(['webserver']) {
+            sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.88.160'
+            sh 'scp /var/lib/jenkins/workspace/k8s-all/* ubuntu@172.31.88.160:/home/ubuntu'
+        }
+    }
+} 
