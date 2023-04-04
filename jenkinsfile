@@ -38,4 +38,9 @@ node {
             sh 'scp /var/lib/jenkins/workspace/k8s-all/* ubuntu@172.31.88.160:/home/ubuntu'
         }
     }
+    stage('k8s deployment using ansible'){
+        sshagent(['ansi'])
+        sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 cd /home/ubuntu/'
+        sh 'ssh -o StrictHostKeyChecking=no ubuntu@172.31.81.200 ansible-playbook ansible.yaml'
+    }
 } 
